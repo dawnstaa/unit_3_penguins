@@ -1,0 +1,317 @@
+---
+title: "3.1: Intro to dplyr"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=6, fig.asp = 0.618, collapse=TRUE) 
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+
+### Unit 3: Penguins
+#### Lesson 1: Intro to dplyr (data manipulation)
+#### New functions: 
+install.packages(), library(), as.data.frame(), filter(), arrange(), select(), rename(), mutate(), summarize(), group_by(), ungroup(), distinct(), print(), unlist(), write_csv()
+
+***
+
+### The Tidyverse
+
+Now that we have been through the slog of learning to program in R using techniques and functions in the base R package, it's time to explore the set of packages in the `Tidyverse` that make coding more efficient, easier to write and read, and produces great visualizations. Developed by RStudio’s chief scientist Hadley Wickham, the `Tidyverse` provides a well-documented workflow for general data modeling, wrangling, and visualization tasks. The `Tidyverse` is a collection of R packages built around the basic concept that data in a table should have one observation per row, one variable per column, and only one value per cell. 
+
+To get the `Tidverse` packages up and running in your R script or your RMarkdown document, you must first install the `Tidyverse` package. Recall that you can do that in RStudio by going to `Tools -> Install Packages` and then type `Tidyverse` into `Packages` field. Make sure that the check box next to `Install dependencies` is checked, then press `Install`. You can also do this from the command line or at the top of your R script with the command:
+
+```{r, eval=FALSE}
+install.packages("tidyverse")
+```
+
+Remember you only have to install packages on your computer once. When you return to work in R the next day, or week, or month, etc. the package will still be installed on your computer. To use `Tidyverse` in your R script, you need to load the package library. This needs to happen at every R session where you intend to use that package:
+
+```{r}
+library("tidyverse")
+```
+
+You can see the suite of packages that are loaded when you load the `Tidyverse` library using the following command:
+
+```{r}
+tidyverse_packages()
+```
+
+The packages we will be using consistently throughout the remainder of this course are `dplyr` (for data wrangling) and `ggplot2` (for visualization). Note that the `lubridate` package that we have already used is part of the `Tidyverse` as well. 
+
+#### Tidy data
+
+The `Tidyverse` is built around the basic concept that data in a table should have one observation per row, one variable per column, and only one value per cell. Once data is in this 'tidy' format, it can be transformed, visualized and modelled for an analysis. This is depicted in Hadley Wickham's famous flow chart:
+
+![](doc/Data_wrangling.png)
+
+When using functions in the `Tidyverse` ecosystem, most data is returned as a `tibble` object. `Tibbles` are very similar to the `data.frames` we were working with earlier, and it is perfectly fine to use `Tidyverse` functions on a `data.frame` object. Just be aware that in most cases, the `Tidyverse` function will transform your data into a `tibble.` If you are unobservant, you won't even notice a difference. However, there are a few differences between the two flat data types, most of which are just designed to make your life easier. The most obvious differences when you work with `tibbles`:
+
++  printing in the console looks a bit different 
++  never changes the type of the inputs (e.g. it never converts strings to factors!)
++  never creates row names
++  never changes the names of variables
++  tibbles generate a warning if the column you are trying to access does not exist
+
+Some older functions don’t work with `tibbles.` If you encounter one of these functions, use `as.data.frame()` to turn a tibble back to a data.frame:
+
+```{r, eval=FALSE}
+my_data = as.data.frame(my_data)
+```
+
+### dplyr
+
+The `dplyr` package is designed to make it easier to manipulate flat (2-D) data. `dplyr` provides simple "verbs", functions that correspond to the most common data manipulation tasks, to help you translate your thoughts into code. This package also uses efficient backends, so you spend less time waiting for the computer. Here are the most common functions that we will be using in `dplyr`:
+
+dplyr aims to provide a function for each basic verb of data manipulation:
+
+  * `filter()` chooses rows based on column values.
+  * `arrange()` changes the order of the rows.
+  * `select()` changes whether or not a column is included.
+  * `rename()` changes the name of columns.
+  * `mutate()` changes the values of columns and creates new columns.
+  * `summarize()` collapses a group into a single row.
+  * `group_by()` group data into rows with the same values
+  * `ungroup()` remove grouping information from data frame.
+  * `distinct()` remove duplicate rows. 
+
+Let's read in some data and try out one of these dplyr functions.
+
+### Penguin data
+
+We will look at a data set of penguin size measurements for three penguin species observed on three islands in the Palmer Archipelago, Antarctica. The data were collected from 2007 - 2009 by Dr. Kristen Gorman with the [Palmer Station Long Term Ecological Research Program](https://pal.lternet.edu/). In 2020, the data were bundled into a neat R package `palmerpenguins` by Allison Horst to use as an alternative to the famed `iris` dataset. In addition to being a fabulous data scientist, Allison (@allison_horst) is an amazing artist:
+![](doc/lter_penguins_horst.png){width=50%}
+
+So let's load up the `palmerpenguins` library:
+
+```{r}
+library(palmerpenguins)
+```
+
+If you want to get a peek at what's in this library, go over to the `Environment` pane (upper right) in RStudio. Look for the tab that says `Global Environment` and click on the down arrow. Select `package:palmerpenguins` and see what is in this library's environment. There are two datasets in the package called `penguins` and `penguins_raw`. We'll be working with `penguins` over the next few lessons. Let's use some of our favorite data exploration tools to get familiar with the dataset:
+
+```{r}
+head(penguins)
+summary(penguins)
+dim(penguins)
+```
+
+The `dplyr` version of the `head()` function to take a look at the first few values of each variable is `glimpse()`:
+
+```{r}
+glimpse(penguins)
+```
+
+I like `head()` better because I like to see my data in column-format, since that's how I usually think about my data frames. You should use whichever function / format you like best. Just don't forget to always look at your data before you try to start an analysis!
+
+### Using dplyr functions: filter()
+
+Now we'll demonstrate how the `dplyr` functions can be used to subset, transform and summarize data. We can use the `filter()` function in `dplyr` to grab only the gentoo penguins:
+
+```{r}
+gentoo = filter(penguins, species=="Gentoo")
+```
+
+`filter()` gave us just the subset of Gentoo penguins. Now perhaps we want to grab only the females:
+
+```{r}
+gentoo_ladies = filter(gentoo, sex=="female")
+summary(gentoo_ladies)
+```
+
+We can see in the summary output that the number of Adelie and Chinstrap penguins now equals zero and the males and NA's have been zeroed out as well. We could have done both of these steps in a single line of code:
+
+```{r}
+gentoo_ladies = filter(penguins, species=="Gentoo", sex=="female")
+```
+
+Note again that one of the really nice things about `dplyr` is that the code is easy to read and translate into human thoughts and tasks. 
+
+### The pipe
+
+All of the dplyr functions take a data frame (or tibble) as the first argument. Rather than forcing the user to either save intermediate objects or nest functions, dplyr provides the pipe operator `%>%` from the package `magrittr`. The pipe operator allows us to combine multiple operations in R into a single sequential chain of actions.
+
+Let’s start with a hypothetical example. Say you would like to perform a sequence of operations on data frame `x` using hypothetical functions f(), g(), and h():
+
+1.  Take x *then*
+2.  Use x as an input to a function f() *then*
+3.  Use the output of f(x) as an input to a function g() *then*
+4.  Use the output of g(f(x)) as an input to a function h()
+
+One way to achieve this sequence of operations is by using nesting parentheses as follows:
+
+```
+h(g(f(x)))
+```
+
+This code isn’t so hard to read since we are applying only three functions: f(), then g(), then h() and each of the functions is short in its name. Further, each of these functions also only has one argument. However, you can imagine that this will get progressively harder to read as the number of functions applied in your sequence increases and the arguments in each function increase as well. This is where the pipe operator %>% comes in handy. %>% takes the output of one function and then “pipes” it to be the input of the next function. Furthermore, a helpful trick is to read %>% as “then” or “and then.” For example, you can obtain the same output as the hypothetical sequence of functions as follows:
+
+```
+x %>% 
+  f() %>% 
+  g() %>% 
+  h()
+```
+
+You would read this sequence as:
+
+1. Take x *then*
+2. Use this output as the input to the next function f() *then*
+3. Use this output as the input to the next function g() *then*
+4. Use this output as the input to the next function h()
+
+So while both approaches achieve the same goal, the latter is much more human-readable because you can clearly read the sequence of operations line-by-line. 
+
+This is how a single transformation with `filter()` looks with and without a pipe: 
+
+```{r}
+# These two lines of code are equivalent:
+gentoo_ladies = filter(penguins, species=="Gentoo", sex=="female")
+gentoo_ladies = penguins %>% filter(species=="Gentoo", sex=="female")
+```
+
+This piping style of writing code becomes incredibly efficient when you start to string lots of data manipulation tasks together. 
+
+Now let's use the `summarize()` function to find the mean mass (in grams) of all of the female penguins in the dataset:
+
+```{r}
+female_mean_mass = penguins %>% filter(sex == "female") %>% summarize(mean_mass_g = mean(body_mass_g))
+female_mean_mass
+```
+Note how we used the pipes to string several `dplyr` functions together. We start with the data set that we are interested in working with (`penguins`), then use `filter()` to separate out females only, then use the `summarize()` function to find the mean value of the column `body_mass_g`. Now that you see how we can link several actions together using the `%>%` pipe, let's add some white space to the code to make it even easier to read. The pipe allows you to separate the command chain into new lines in your script document, but when you run the code it is all run together as a single line of code:
+
+```{r}
+female_mean_mass = penguins %>% 
+  filter(sex == "female") %>% 
+  summarize(mean_mass_g = mean(body_mass_g))
+```
+
+This is the standard coding etiquette used when writing piped dplyr commands because it's easier to skim your eye along the left side of the script and get a sense of what actions are occuring and in what order. This may not seem like a big deal at the moment, but as our transformations become more complex, this will greatly improve readability.
+
+This is much cleaner to write, and easier to read, than if we did this in base R: 
+
+```{r}
+female_penguins = penguins[which(penguins$sex == "female"), ] 
+female_mean_mass = mean(female_penguins$body_mass_g)
+
+# Or to do it all in one line of code: 
+female_mean_mass = mean(unlist(penguins[which(penguins$sex == "female"), "body_mass_g"]))
+```
+
+The `dplyr` syntax is simpler, and the name of the original dataset (`penguins`) does not need to be repeated when using `filter()`, unlike when using `which()`. Base R also requires the creation of an interim variable, or if you want it to all fit into one line of code, you must use the `which()` function to subset across rows and columns simultaneously and then `unlist()` your `data.frame` or `tibble` so that it can be read into the `mean()` function as an array. 
+
+***
+
+### Exercise 1.1
+
+Build a data set that contains only Chinstrap penguins. Then build another data set that contains only Chinstrap penguins with a flipper length > 200 mm. What is the sex ratio of Chinstrap penguins? How does that compare to the sex ratio of Chinstrap penguins with a flipper length > 200 mm? Use the `summary()` function to examine sex ratios. Given this analysis, what do you think the relationship is between sex and flipper length?
+
+***
+
+### More dplyr functions: filter() group_by() summarize() print()
+
+Now let's ratchet up our analysis a few notches and say that you need to know the mean body mass for each sex of each penguin species. Perhaps you want to throw out unknown sex birds so that they don't bias your data. You can use `group_by()` to indicate that you want to consider each sex and each species as a distinct dataset when you use the `summarize()` function. Let's finish it off by printing it out to the console with `print()`. These may be valuable summary statistics that we want to refer back to when we are writing up our analysis, or perhaps we'll want to include the results in a table in a presentation at a conference. Either way, let's save our new summary table of mean body mass to a `.csv` in our project folder:
+
+```{r}
+# Calculate mass of each species
+species_mean_mass = penguins %>% 
+  group_by(species) %>%
+  summarize(mean_mass_g = mean(body_mass_g, na.rm=TRUE)) 
+
+# Calculate mass of each species by sex
+species_sex_mean_mass = penguins %>% 
+  filter(!is.na(sex)) %>%   # Removes rows where sex is NA. Read the ! as the word "not" here - i.e. it flips the logical value
+  group_by(species, sex) %>%
+  summarize(mean_mass_g = mean(body_mass_g)) %>%
+  print()
+
+# Save the table
+write_csv(species_sex_mean_mass, path="data/processed/peguin_mean_body_mass_g.csv")
+```
+
+Note, I used `write_csv()` in the `dplyr` package, but this is almost equivalent to `write.csv()` in base R. It doesn't really matter which write function you use here.
+
+So that's a nice, neat, easy to read analysis that takes advantage of the consistent syntactical format across `dplyr` functions and avoids unnecessary repetition. If we calculated the same summary statistics in base R, we'd have to repeat the analysis separately for each combination of species / sex, or write an unwiedly for loop that stepped through the data subsets.
+
+We used the `mean()` function in our dplyr `summarize()` command, but there are many different summary functions that can be used inside of  `summarize()`:
+
+*  Center:   mean(), median()
+*  Spread:   sd(), IQR(), mad()
+*  Range:    min(), max(), quantile()
+*  Position: first(), last(), nth(),
+*  Count:    n(), n_distinct()
+*  Logical:  any(), all()
+
+***
+
+### Exercise 1.2
+
+Repeat Exercise 1.1, but this time use `group_by()` along with the `n()` function inside `summarize()` to count the number of Chinstrap penguins of each sex. Again compare the sex ratio of all Chinstrap observations vs. the sex ratio of Chinstrap penguins with a flipper length > 200 mm.
+
+***
+
+### More dplyr functions: group_by() summarize() mutate() distinct() select() arrange()
+
+Here are a few more examples of simple things you can do with `dplyr`:
+
+```{r}
+# Which species has the most observations?
+n_by_species = penguins %>%
+  group_by(species) %>%
+  summarize(n = n()) 
+
+# Use mutate() to convert body mass units:
+penguins_for_america = penguins %>%
+  mutate(body_mass_lb = body_mass_g * 0.0022) # 0.0022 lb/g
+
+# Quickly display the names of all of the islands surveyed:
+penguins %>%
+  distinct(island)
+
+# Grab just the species and sex columns:
+penguins_brief = penguins %>% 
+  select(species, sex)
+
+# Remove bill data:
+penguins_no_bill = penguins %>%
+  select(-bill_length_mm, -bill_depth_mm)
+
+# Sort data by body mass, then species:
+penguins_sorted = penguins %>%
+  arrange(body_mass_g, species)
+
+# Sort data by body mass (highest to lowest), then species:
+penguins_sorted = penguins %>%
+  arrange(rev(body_mass_g), species)
+```
+
+***
+
+### Exercise 1.3
+
+What is the mean bill length (in inches) of Adelie penguins found on either Dream island or Biscoe island? What is the standard deviation? Is the mean larger or smaller than the mean bill length of Adelie penguins found on Torgersen island?
+
+***
+
+### More Information:
+
+The official (recommended, not required) text assigned for this class is R for Data Science by Hadely Wickham and Garrett Grolemund:
+
+https://r4ds.had.co.nz/
+
+Since Hadley is the developer of the `Tidyvserse` suite of packages, his text is a great resource for learning more about `dplyr.`
+
+### Acknowledgements
+
+Dr. Allison Horst at the Bren School at UC Santa Barbara is one of the masterminds of the `palmerpenguins` R package. She has created a lot of R training content that has been inspirational here and other places throughout the course. She hosts a great website and lots of content on GitHub that is worth perusing if you are interested in diving deeper into data science in R:
+
+https://allisonhorst.github.io/
+
+Allison's data science-themed artwork is especially unique and inspirational:
+
+https://github.com/allisonhorst/stats-illustrations
+
+
+
+

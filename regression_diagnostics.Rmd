@@ -1,0 +1,268 @@
+---
+title: "Regression diagnostics"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=6, fig.asp = 0.618, collapse = TRUE) 
+```
+
+### Unit 3: Penguins
+### Regression Diagnostics
+
+Let's run through the formal tests that can be used for linear regression diagnostics. We'll do this with the penguins data using the linear model `bill_depth_mm ~ bill_length_mm`. We'll compare a "bad" example of this model where we run this model with all penguin data (3 species, both sexes) vs. a better example of the model run with just one species and sex.
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(palmerpenguins)
+library(gvlma)  # gvlma()
+library(GGally)
+library(car)
+library(MASS)
+library(rstatix) # identify_outliers()
+```
+
+```{r}
+# Build models
+lm_bad = lm(bill_depth_mm ~ bill_length_mm, data=penguins)
+summary(lm_bad)
+
+gentoo_males = penguins %>% filter(species=="Gentoo", sex=="male")
+lm_good = lm(bill_depth_mm ~ bill_length_mm, data=gentoo_males)
+summary(lm_good)
+```
+
+### Diagnostics
+
+#### Using p-value to check for statistical significance of model
+
+The summary statistics (i.e. `summary(lm_bad)`) above tell us the model’s p-value (in the last line) and the p-Value of individual predictor variables (extreme right column under `Coefficients`). We can consider a linear model to be statistically significant only when both these p-values are less than the pre-determined statistical significance level of 0.05. This can visually interpreted by the significance stars at the end of the row against each X variable. The more the stars beside the variable�s p-Value, the more significant the variable.
+
+What is the Null and Alternate Hypothesis?
+Whenever there is a p-value, there is always a Null and Alternate Hypothesis associated. In Linear Regression: 
+
+-  Null Hypothesis (H0) is that the beta coefficients associated with the variables is equal to zero.
+-  Alternate hypothesis (H1) is that the coefficients are not equal to zero. (i.e. there exists a relationship between the independent variable in question and the dependent variable).
+
+When the p-value is less than significance level ($\alpha < 0.05$), you can safely reject the null hypothesis that the co-efficient of the predictor is zero. In our case, the model and coefficient p-values of both `lm_good` and `lm_bad` are all well below the 0.05 threshold. So, you can reject the null hypothesis and conclude the model is indeed statistically significant.
+
+#### R-Squared and Adj R-Squared
+
+$R^2$ tells us the proportion of variation in the dependent (response) variable that has been explained by this model. As you add more X variables to your model, the R-Squared value of the new bigger model will always be greater than that of the smaller subset. This is because, any explanatory power that the new X variables add, no matter how small, will increase the $R^2$. 
+
+Adjusted $R^2$ is formulated such that it penalises the number of explanatory terms in your model. So unlike $R^2$, as the number of predictors in the model increases, the Adjusted $R^2$ may not always increase. Therefore when comparing nested models, it is a good practice to compare using Adjusted $R^2$ rather than just $R^2$.
+
+Neither of our models  have a high $R^2$: `lm_good` $Adjusted R^2 = 0.07875$  and `lm_bad` $Adjusted R^2 = 0.05247$. This means we are not capturing the mechanism behind much of the variation in bill depth with our model.
+
+
+#### Seven Major Assumptions of Linear Regression Are:
+
+1. The relationship between all X’s and Y is linear. Violation of this assumption leads to changes in regression coefficient estimation.
+2. All necessary independent variables are included in the regression that are specified by existing theory and/or research ("omitted variable bias"). This asusmption serves the purpose of saving us from making large claims when we simply have failed to account for (a) better predictor(s) which may share variance with other predictors. This will not be covered in this tutorial as meeting this assumption is up to your discretion as a researcher, dependent on knowledge of your specific research topic and question.
+3. There is no error in our measurements of X. This assumption is almost always violated. This will typically downward bias (make smaller) the regression coefficients in your model. This will not be covered in this tutorial as meeting this assumption is nearly impossible. If you are interested in Model-II regression (where there is error in the measurement of the independent variables as well as the dependent variables), the `lmodel2` package can run a variety of model 2 regressions, plot them, calculate confidence intervals, and perform statistical tests.
+4. There is constant variance across the range of residuals for each X (this is sometimes referred to as homoscedasticity, whereas violations are termed heteroscedastic).
+5. Residuals are independent from one another (i.e. no autocorrelation). Residuals cannot be associated for any subgroup of observations. Multilevel modeling is a more appropriate generalized form of regression which is able to handle dependencies in model error structures.
+6. Residuals are normally distributed.
+7. There is no multicollinearity (a very high correlation) between X predictors in the model. Violation of this assumption reduces the amount of unique variance in X that can explain variance in Y and makes interpretation difficult.
+
+#### Checking the assumption of linearity
+
+Of interest to checking the assumption of linearity, we will want to “eyeball” the scatterplots and distributions to determine if we have met our assumption of linearity. The check of the scatterplot also provides some insight into if there are any outliers, or extreme values in your dataset, as well as the variability in your dataset and how that variability moves together with other variables in your regression model. 
+
+We may also want to perform a more thorough check using a loess smoother for each variable in the model. A loess smoother selectively weights points in the regression. We can also overlay the straight regression line to determine how the loess smoothing of data compares to a linear regression.
+
+```{r, warning=FALSE, message=FALSE}
+# Note that due to the order we loaded the libraries, MASS::select masks dplyr::select
+find("select")
+
+# Use GGally pairs plot to look at data
+ggpairs(gentoo_males %>% dplyr::select(bill_depth_mm, bill_length_mm))
+
+# Plot a loess smoother and a linear model to the data
+ggplot(gentoo_males, aes(y=bill_depth_mm, x=bill_length_mm)) + 
+  stat_smooth(method="loess") + 
+  stat_smooth(method="lm", color="red", fill="red", alpha=.25) + 
+  geom_point()
+```
+
+The scatterplot in ggpairs() doesn't suggest a strong linear trend, but at least there is no significant non-linear trend immediately discernible. The linear relationship between bill depth and bill length doesn't look too bad, but model predictions don't hold up as well when bill length is very small. The smallest bill length point seems to really be influencing model behavior on the left side of the figure. It might be worth it to double check that point. Was it entered correctly? Were there notes in the raw data about challenges when collecting that data point? Is there something about that penguin that doesn't fit with the rest of the data (i.e. it was a juvenile and the rest were adults)? If it seems like there is a valid reason to throw out the datapoint, then you should. However, don't throw out the data point just becuase it screws up your model. If that truly is this penguin's beak measurement, and that penguin belongs in the analysis, it should be kept there.
+
+Let's check the same plots with our "bad model" that lumps all three species together:
+
+```{r, warning=FALSE, message=FALSE}
+# Use GGally pairs plot to look at data
+ggpairs(penguins %>% dplyr::select(bill_depth_mm, bill_length_mm))
+
+# Plot a loess smoother and a linear model to the data
+ggplot(penguins, aes(y=bill_depth_mm, x=bill_length_mm)) + 
+  stat_smooth(method="loess") + 
+  stat_smooth(method="lm", color="red", fill="red", alpha=.25) + 
+  geom_point()
+```
+
+The distinct clusters of data in the ggpairs() scatterplot is a concern. It seems like there is some structure in this relationship that we haven't captured. Even more concerning, the loess smoother looks like a rollercoaster, and doesn't approximate the linear model at all. This is a big warning sign that a linear model is not a good choice for this data.
+
+#### Checking the assumption of constant variance of residuals (Homoscedasticity)
+
+We will generate a plot with a red line (linear fit) and a dashed blue line (loess smoothed fit) using the `spreadLevelPlot()` function from the `car` package. Again, we are looking for any lawful curves or skewness in the data that may suggest that our regression model is better or worse at predicting for specific levels of our predictors. Absolute studentized residuals refers to the absolute values (ignoring over or underfitting) of the quotient resulting from the division of a residual by an estimate of its standard deviation. These should be roughly equally distributed across the range of the fitted Y values.
+
+Another way to check the assumption of constant error variance is to conduct a Breush-Pagan test using the `ncvTest()` function from the `car` package. If the assumption of homoscedasticity is met, then the null hypothesis that the error variance is constant is supported in the Breush-Pagan test, so the p-value will be greater than a significance level of 0.05. Alternatively, if the p-value is less than 0.05, then we reject the null hypothesis and accept the alternative hypothesis that there is non-constant error variance, i.e. heteroscedasticity is indeed present.
+
+```{r}
+spreadLevelPlot(lm_good)
+ncvTest(lm_good)
+```
+
+For `lm_good`, even though there appear to possibly be some small curves in the loess smoother, the linear fit seems fairly straight across the scale. The `ncvTest()` result has a p-value>0.05, so we have homoscedasticity.
+
+```{r}
+spreadLevelPlot(lm_bad)
+ncvTest(lm_bad)
+```
+
+For `lm_bad`, the spreadLevelPlot() is a bit more concerning because there is a clear non-linear shape to the loess smoother (the pink line). The `ncvTest()` result has a p-value<0.05, so we have heteroscedasticity. If you are interested in going forward with a model that has heterscedasticity, and your other assumptions aren't problematic, you can present your model results with robust standard errors. One way to calculate robust standard errors is using the `robust()` function in the `sjstats` package.
+
+#### Checking the assumption of normality of residuals
+
+Q-Q plots are used to assess whether your distibution of residuals (represented on the Y axis) roughly approximate a normal distribution of residuals (represented on the X axis). The points should mostly fall on the diagonal line in the middle of the plot. If this assumption is violated, the points will fall in some sort of curve shape, such as an S, or will form two separate, variable lines.
+
+```{r}
+# Normality of Residuals: qq plot for studentized resid
+car::qqPlot(lm_good, main="lm_good") # distribution of studentized residuals
+```
+For `lm_good`, we can see the that each observation roughly falls on the straight line, indicating that our residuals are roughly normally distributed. Though there is a little bit of bend, there is no significant curve or break in the data, so we have met this assumption. In addition, none of the points falls outside the 95% confidence intervals (depicted using the dashed lines), indicating that there are seemingly no extreme residual values. We have met the assumption of normality of residuals.
+
+```{r}
+# Normality of Residuals: qq plot for studentized resid
+car::qqPlot(lm_good, main="lm_bad") # distribution of studentized residuals
+```
+
+For `lm_bad` the observations wiggle around the straight line in a more severe S-shape curve, and many of the points fall outside of the 95% confidence intervals. These residuals don't look very normal.
+
+#### Checking for multicollinearity (in multiple regression)
+
+If your linear regression has more than one explanatory variable, the X's should not be very tightly correlated. One of the primary indicators of multicollinearity is the variance inflation factor (VIF). The VIF indicates the amount of increase in variance of regression coefficient relative to when all predictors are uncorrelated. If the VIF of a variable is high, it means the variance explained by that variable is already explained by other X variables present in the given model, which means that variable is likely redundant. The lower the VIF, the better. If the VIF is less some threshold, we meet the assumption of no multicollinearity. Common VIF thresholds are 3, 5 and 10, where the smaller thresholds are more conservative. 
+
+So far in this lesson, we have just been looking at simple regression. To demonstrate how you could check the assumption of multicolinearity, we can build a quick multiple regression model and run the `vif()` function from the `car` package.
+
+```{r}
+lm_multi = lm(bill_depth_mm ~ bill_length_mm + body_mass_g, data=gentoo_males)
+vif(lm_multi)
+```
+
+It appears that the VIF for both of our predictors is less than 3, so we have definitely met the assumption of multicollinearity for this model. 
+
+If you are testing collinearity with a more complex model, such as one that includes a categorical variable, the vif() function will return Generalized Variation Inflation Factors (GVIF) and $GVIF^(1/(2*df)$. You can apply the test by squaring the  $GVIF^(1/(2*df)$ and applying that value to the same VIF threshold that you like to use, i.e. 3, 5 or 10, depending on how conservative you want to be.
+
+If there is multicollinearity present in your model and you violate this assumption, however, you have the options of:
+
+1. combining highly correlated predictors into a single index
+2. removing predictor(s)
+3. using a different type of model
+
+#### Non-independence of errors
+
+Another assumption of the linear model is that your data are not autocorrelated. This can be a problem in time series data or spatial data. For example, your best guess on what the weather is going to be today is probably to look at what the weather was like yesterday, so weather data are autocorrelated. This won't be a problem with our penguin data, however, if you need to test for autocorrelation you can use the Durbin Watson test:
+
+```{r}
+# Test for Autocorrelated Errors
+durbinWatsonTest(lm_good)
+```
+
+The p-value is greater than 0.05, so we can accept the null hypothesis that the data are not autocorrelated. Of course, this isn't an appropriate test since our penguin samples are obviously independent. However, interestingly enough, if we run our bad penguin model through the Durbin Watson test:
+
+```{r}
+# Test for Autocorrelated Errors
+durbinWatsonTest(lm_bad)
+```
+
+the p-value is < 0.05, so we reject the null hypothesis and find that our data ARE autocorrelated. Again, this is a nonsensical test given our data, however, they are reading as autocorrelated because our data are listed in order by species. So the first part of the data all look similar becuase they are all Adelie penguins. The second group of the data are all Gentoo, and the third group are all Chinstrap. That makes the data look autocorrelated.
+
+If you find you legitimately have autocorrelation, you can identify your lag and use Newey-West robust standard errors.
+
+#### Comparing fitness of models
+
+Akaike’s Information Criterion (AIC) is a very useful model selection tool for comparing the fitness of 2 or more models, whether or not they are "nested" models. The AIC uses the likelihood of a model and penalizes it for the number of parameters included in the model. Parsimony is favored, which means if 2 models do a very similar job at predicting a dependent variable, the AIC selects for the simpler model. Although the AIC will choose the best model from a set, it won’t say anything about absolute quality. In other words, if all of your models are poor, it will choose the best of a bad bunch. The function `AIC()` in R can be used to compare models, and the model with the lowest AIC is considered the best in the bunch. A good rule of thumb is that if the difference in AIC is greater than 2, than the model with the lower AIC is a significantly better fit than the other model(s). When comparing the AIC of 2 or more models, the models must be fit using the same set of data. So, for example, it wouldn't make any sense to compare the AIC of `lm_good` and `lm_bad` because `lm_bad` is fit using all of our penguin data and `lm_good` is fit using only Gentoo males.
+
+We can compare the AIC of lm_good and lm_multi, since these were both built using the Gentoo males data:
+
+```{r}
+# Compare model fitness using Akaike Information Criterion
+AIC(lm_good, lm_multi)
+```
+
+Technically `lm_good` is a better fit than `lm_multi.` The likelihood of `lm_multi` must be at least as high or higher (i.e. good at predicting bill depth) as the likelihood of `lm_good` because it has all of the explanatory power of `lm_good`, plus it adds an additional explanatory variable. However, `lm_good` still has a lower AIC (i.e. a better fit) because the addition of body mass did not improve `lm_multi` very much, and `lm_multi` is penalized in the AIC for being a more complex model, since `lm_multi` is a model with 3 parameters whereas `lm_good` is a model with only 2 parameters.
+
+#### Checking the data for outliers
+
+Once we are sure that our regression model meets all other assumptions, it is prudent to check for outlier (extreme) cases which may bias the estimation of our signifiance terms, such as p-values and 95% confidence intervals. If values are extreme enough, it is possible that a single case may change a result from “significant” to “non-significant”, and vice-versa, dependent on your chosen alpha level. Although I don't think outliers should be removed without a good reason, it's important to be aware of them and check them carefully to make sure they are not mistakes and that they belong in the data. 
+
+One way to check outliers is to calculate leverage values (capped at 1), which is how much a data point influences the model. We'll plot these leverage values against row number in our dataset, and that way if something sticks out as potentially problematic, we can check that row of data to learn more. 
+
+```{r}
+gentoo_males$leverage = hatvalues(lm_good)  # Calculate leverage values
+gentoo_males$row_num = as.numeric(rownames(gentoo_males))
+ggplot(gentoo_males, aes(row_num, leverage)) + 
+  geom_point() + 
+  xlab('Row number') + ylim(0,1) 
+gentoo_males[17,]
+```
+
+You can also use the function identify_outliers(), which uses boxplot methods to return a data frame of outliers (see `?identify_outliers` for more info)
+
+```{r}
+# Test for the presence of outliers in the bill length and bill depth data
+gentoo_males %>%
+  identify_outliers(bill_depth_mm)
+
+gentoo_males %>%
+  identify_outliers(bill_length_mm) # 5 outliers found
+
+# Note: here is a result from a made-up dataset where I added an outlier
+# data.frame(dat=c(rnorm(100), 312)) %>% identify_outliers()  
+```
+
+The identify_outliers() test returned nothing for the bill length data set, but returned 5 outliers for the bill depth data set. One of the bill depth outliers was classified as "extreme", but a glance at the data looks like that was just a big penguin. The data doesn't appear to be improperly coded or anything, so we can leave it in. 
+
+### Quickly check many assumptions at once
+
+If the above seems unwieldy, you’re under a time-crunch for a project deadline, or you have a good sense that you’ve met most of the assumptions already, you may want to use just a few quick functions to see if you’ve met some of the assumptions of regression. The first uses the plot function from base R, which handles lm objects differently than dataframes.
+
+```{r}
+plot(lm_bad)
+```
+
+These four plots are important diagnostic tools in assessing whether the linear model is appropriate. The first two plots are the most important, but the last two can also help with identifying outliers and non-linearities.
+
+1. Residuals vs. Fitted When a linear model is appropriate, we expect the residuals will have constant variance when plotted against fitted values; and the residuals and fitted values will be uncorrelated. If there are clear trends in the residual plot, or the plot looks like a funnel, these are clear indicators that the given linear model is inappropriate.
+2. Normal QQ plot You can use a linear model for prediction even if the underlying normality assumptions don’t hold. However, in order for the p-values to be believable, the residuals from the regression must look approximately normally distributed.
+3. Scale-location plot This is another version of the residuals vs fitted plot. There should be no discernible trends in this plot.
+4. Residuals vs Leverage. Leverage is a measure of how much an observation influenced the model fit. It’s a one-number summary of how different the model fit would be if the given observation was excluded, compared to the model fit where the observation is included. Points with high residual (poorly described by the model) and high leverage (high influence on model fit) are outliers. They’re skewing the model fit away from the rest of the data, and don’t really seem to fit with the rest of the data.
+
+A second useful function is provided by the gvlma function in the gvlma package which will quickly check 5 assumptions for you.
+
+```{r}
+gvlma(lm_bad)
+gvlma(lm_good)
+```
+
+These assumptions are:
+
+1. Are the relationships between your X predictors and Y roughly linear? Rejection of the null (p < .05) indicates a non-linear relationship between one or more of your X’s and Y. This means that you should likely use an alternative modeling technique or add an additional transformed X term to your model to agree with the data structure (e.g. add a quadratic term, X-squared, to the model if the relationship seems curvilinear from further scatterplot inspection).
+2. Is your distribution skewed positively or negatively, necessitating a transformation to meet the assumption of normality? Rejection of the null (p < .05) indicates that you should likely transform your data.
+3. Is your distribution kurtotic (highly peaked or very shallowly peaked), necessitating a transformation to meet the assumption of normality? Rejection of the null (p < .05) indicates that you should likely transform your data.
+4. Is your dependent variable truly continuous, or categorical? Rejection of the null (p < .05) indicates that you should use an alternative form of the generalized linear model (e.g. logistic or binomial regression).
+5. Is the variance of your model residuals constant across the range of X (assumption of homoscedastiity)? Rejection of the null (p < .05) indicates that your residuals are heteroscedastic, and thus non-constant across the range of X. Your model is better/worse at predicting for certain ranges of your X scales.
+
+### Keep calm and model on
+
+Keep in mind that regression is fairly robust to minor violations of assumptions. If you have a serious violation of your assumption, there's often a relatively simple method for dealing with it so you can still run and present a linear model. 
+
+### Acknowledgements
+
+Much of this post was adapted from an excellent page by Ian Ruginski on regression diagnostics:
+https://www.ianruginski.com/post/regressionassumptions/
+
+
+
+
