@@ -18,7 +18,7 @@ install.packages(), library(), as.data.frame(), filter(), arrange(), select(), r
 
 ### The Tidyverse
 
-Now that we have been through the slog of learning to program in R using techniques and functions in the base R package, it's time to explore the set of packages in the `Tidyverse` that make coding more efficient, easier to write and read, and produces great visualizations. Developed by RStudio’s chief scientist Hadley Wickham, the `Tidyverse` provides a well-documented workflow for general data modeling, wrangling, and visualization tasks. The `Tidyverse` is a collection of R packages built around the basic concept that data in a table should have one observation per row, one variable per column, and only one value per cell. 
+Now that we have been through the slog of learning to program in R using techniques and functions in the base R package, it's time to explore the set of packages in the `Tidyverse` that make coding more efficient, easier to write and read, and produces great visualizations. Developed by RStudio’s chief scientist Hadley Wickham, the `Tidyverse` provides a well-documented workflow for general data modeling, wrangling, and visualization tasks. 
 
 To get the `Tidverse` packages up and running in your R script or your RMarkdown document, you must first install the `Tidyverse` package. Recall that you can do that in RStudio by going to `Tools -> Install Packages` and then type `Tidyverse` into `Packages` field. Make sure that the check box next to `Install dependencies` is checked, then press `Install`. You can also do this from the command line or at the top of your R script with the command:
 
@@ -124,6 +124,7 @@ We can see in the summary output that the number of Adelie and Chinstrap penguin
 
 ```{r}
 gentoo_ladies = filter(penguins, species=="Gentoo", sex=="female")
+# gentoo_ladies = gentoo[gentoo$species == "Gentoo" & gentoo$sex == "female", ] # vs. base R (note, this retains NAs)
 ```
 
 Note again that one of the really nice things about `dplyr` is that the code is easy to read and translate into human thoughts and tasks. 
@@ -199,7 +200,7 @@ female_mean_mass = mean(female_penguins$body_mass_g)
 female_mean_mass = mean(unlist(penguins[which(penguins$sex == "female"), "body_mass_g"]))
 ```
 
-The `dplyr` syntax is simpler, and the name of the original dataset (`penguins`) does not need to be repeated when using `filter()`, unlike when using `which()`. Base R also requires the creation of an interim variable, or if you want it to all fit into one line of code, you must use the `which()` function to subset across rows and columns simultaneously and then `unlist()` your `data.frame` or `tibble` so that it can be read into the `mean()` function as an array. 
+The `dplyr` syntax is simpler, and the name of the original dataset (`penguins`) does not need to be repeated when using `filter()`, unlike when using `which()`. Base R also requires the creation of an interim variable, or if you want it to all fit into one line of code, you must subset across rows and columns simultaneously and then `unlist()` your `data.frame` or `tibble` so that it can be read into the `mean()` function as an array. 
 
 ***
 
@@ -232,7 +233,7 @@ write_csv(species_sex_mean_mass, path="data/processed/peguin_mean_body_mass_g.cs
 
 Note, I used `write_csv()` in the `dplyr` package, but this is almost equivalent to `write.csv()` in base R. It doesn't really matter which write function you use here.
 
-So that's a nice, neat, easy to read analysis that takes advantage of the consistent syntactical format across `dplyr` functions and avoids unnecessary repetition. If we calculated the same summary statistics in base R, we'd have to repeat the analysis separately for each combination of species / sex, or write an unwiedly for loop that stepped through the data subsets.
+So that's a nice, neat, easy to read analysis that takes advantage of the consistent syntactical format across `dplyr` functions and avoids unnecessary repetition. If we calculated the same summary statistics in base R, we'd have to repeat the analysis separately for each combination of species / sex, or write an unwieldy `for` loop that stepped through the data subsets.
 
 We used the `mean()` function in our dplyr `summarize()` command, but there are many different summary functions that can be used inside of  `summarize()`:
 
@@ -283,7 +284,7 @@ penguins_sorted = penguins %>%
 
 # Sort data by body mass (highest to lowest), then species:
 penguins_sorted = penguins %>%
-  arrange(rev(body_mass_g), species)
+  arrange(desc(body_mass_g), species)
 ```
 
 ***
